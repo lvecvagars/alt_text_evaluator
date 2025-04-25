@@ -1,0 +1,220 @@
+/* static/style.css */
+body {
+  font-family: sans-serif;
+  line-height: 1.6;
+  margin: 20px;
+  background-color: #f4f4f4;
+  color: #333;
+}
+
+h1,
+h2 {
+  color: #333;
+  border-bottom: 2px solid #007bff;
+  padding-bottom: 5px;
+  margin-bottom: 20px; /* Pievienojam atstarpi zem virsrakstiem */
+}
+
+/* Formas stili */
+form {
+  margin-bottom: 30px;
+  padding: 20px;
+  background-color: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+form label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+form input[type="url"] {
+  padding: 10px;
+  /* Pielāgojam platumu, lai poga būtu blakus, ja logs atļauj */
+  width: calc(100% - 120px); /* Piemērs - poga aizņems ap 100px + atstarpe */
+  max-width: 600px; /* Maksimālais platums lieliem ekrāniem */
+  margin-right: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+  display: inline-block; /* Lai varētu būt blakus pogai */
+  vertical-align: middle; /* Izlīdzina ar pogu */
+}
+
+form button {
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  display: inline-block; /* Lai varētu būt blakus ievades laukam */
+  vertical-align: middle; /* Izlīdzina ar ievades lauku */
+}
+
+form button:hover {
+  background-color: #0056b3;
+}
+
+hr {
+  margin: 30px 0;
+  border: 0;
+  border-top: 1px solid #ddd;
+}
+
+/* Rezultātu kopsavilkums */
+.results-summary {
+  margin-bottom: 30px; /* Lielāka atstarpe pirms detaļām */
+  padding: 15px 20px;
+  background-color: #e9ecef;
+  border-radius: 5px;
+  border-left: 5px solid #007bff; /* Akcenta līnija */
+}
+
+.results-summary p {
+  margin: 8px 0; /* Nedaudz lielākas atstarpes */
+}
+
+/* Rezultātu saraksts */
+.results-list {
+  list-style: none;
+  padding: 0;
+}
+
+.results-list li {
+  border: 1px solid #ddd;
+  margin-bottom: 20px;
+  padding: 15px 20px;
+  border-radius: 8px;
+  background-color: #ffffff;
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  overflow: hidden; /* Lai novērstu problēmas ar gariem src */
+}
+
+.results-list li img {
+  max-width: 100px;
+  max-height: 100px;
+  border: 1px solid #ccc;
+  object-fit: contain;
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+
+.results-list .image-details {
+  flex-grow: 1;
+  /* Lai gari vārdi vai URL pārlūztu jaunā rindā */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 0; /* Svarīgi flexbox kontekstā, lai pārlaušana darbotos */
+}
+
+.results-list .image-details strong {
+  /* Nedaudz izceļam label */
+  color: #555;
+}
+.results-list .image-details a {
+  /* Stils src saitei */
+  color: #0056b3;
+  text-decoration: none;
+}
+.results-list .image-details a:hover {
+  text-decoration: underline;
+}
+
+/* ALT teksta attēlojums */
+.alt-text-display {
+  font-style: italic;
+  display: block;
+  margin-top: 5px; /* Atstarpe no "ALT teksts:" */
+  margin-bottom: 10px;
+  padding: 5px;
+  background-color: #f8f9fa; /* Viegls fons pašam tekstam */
+  border-radius: 3px;
+}
+
+.alt-missing {
+  color: #dc3545;
+  font-weight: bold;
+  border: 1px dashed #dc3545;
+  padding: 2px 5px;
+  display: inline-block;
+  background-color: transparent; /* Noņemam fona krāsu šeit */
+}
+
+.alt-empty {
+  color: #17a2b8;
+  font-weight: bold;
+  border: 1px dashed #17a2b8;
+  padding: 2px 5px;
+  display: inline-block;
+  background-color: transparent; /* Noņemam fona krāsu šeit */
+}
+
+/* Statuss "Izskatās labi" */
+.status-ok {
+  color: #28a745;
+  font-weight: bold;
+  display: block;
+  margin-top: 10px;
+  padding: 5px;
+  background-color: #eaf Hefe; /* Gaiši zaļš fons */
+  border-left: 3px solid #28a745;
+  border-radius: 3px;
+}
+
+/* Ieteikumu saraksts */
+.suggestions {
+  margin-top: 15px;
+  padding-left: 0;
+  list-style-type: none;
+  border-top: 1px solid #eee;
+  padding-top: 15px;
+}
+
+.suggestions li {
+  margin-bottom: 8px;
+  color: #856404; /* Tumši dzeltens teksts */
+  font-size: 0.9em;
+  padding: 8px 12px;
+  border: none;
+  background-color: #fff3cd;
+  border-left: 4px solid #ffc107;
+  border-radius: 4px;
+}
+
+/* Kļūdas ziņojums */
+.error-message {
+  color: #721c24;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  padding: 15px 20px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+}
+
+/* Media query mazākiem ekrāniem */
+@media (max-width: 600px) {
+  form input[type="url"] {
+    width: 100%; /* Aizņem pilnu platumu */
+    margin-right: 0;
+    margin-bottom: 10px; /* Atstarpe pirms pogas */
+    display: block; /* Katrs savā rindā */
+  }
+  form button {
+    width: 100%; /* Poga arī pilnā platumā */
+    display: block; /* Katrs savā rindā */
+  }
+  .results-list li {
+    flex-direction: column; /* Mazos ekrānos elementi viens zem otra */
+  }
+  .results-list li img {
+    margin-bottom: 10px; /* Atstarpe zem attēla */
+  }
+}

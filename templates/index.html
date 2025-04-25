@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="lv">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ALT Teksta Pārbaudītājs</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+  </head>
+  <body>
+    <h1>ALT Teksta Pārbaudītājs</h1>
+
+    <form method="POST" action="/">
+      <label for="url">Ievadi tīmekļa lapas URL:</label>
+      {# Parādām iepriekš ievadīto URL, ja tāds bija #}
+      <input
+        type="url"
+        id="url"
+        name="url"
+        required
+        size="50"
+        value="{{ submitted_url }}"
+      />
+      <button type="submit">Analizēt</button>
+    </form>
+
+    {# Attēlojam kļūdas ziņojumu, ja tāds ir #} {% if error %}
+    <div class="error-message">{{ error }}</div>
+    {% endif %}
+
+    <hr />
+
+    {# Attēlojam rezultātus tikai tad, ja tie ir un nav kļūdas #} {% if results
+    is not none and not error %}
+    <div class="results-summary">
+      <h2>Analīzes Kopsavilkums:</h2>
+      {% set total_images = results|length %} {# Skaitām attēlus ar ieteikumiem
+      (garāks saraksts nekā 0) #} {% set issues_count = results |
+      selectattr('suggestions', '>', []) | list | length %} {% set
+      missing_alt_count = results | selectattr('analysis.exists', 'equalto',
+      false) | list | length %}
+
+      <p>Kopā atrasti attēli: <strong>{{ total_images }}</strong></p>
+      <p>
+        Attēli ar potenciālām problēmām vai ieteikumiem:
+        <strong>{{ issues_count }}</strong>
+      </p>
+      <p>Attēli bez ALT atribūta: <strong>{{ missing_alt_count }}</strong></p>
+    </div>
+
+    <h2>Detalizēti Rezultāti:</h2>
+    <ul class="results-list">
+      {% for image in results %}
+      <li>
+        {# Sīktēls (izmantojam absolūto src) #}
+        <img
+          src="{{ image.src }}"
+          alt="Pārbaudāmā attēla sīktēls ({{ image.src }})"
+          loading="lazy"
+        />
+
+        <div class="image-details">
+          {# Attēla avots #}
+          <strong>Attēls (src):</strong>
+          <a href="{{ image.src }}" target="_blank" rel="noopener noreferrer"
+            >{{ image.src }}</a
+          >
+          <br />
+
+          {# ALT teksta attēlojums #}
+          <strong>ALT teksts:</strong>
+          {% if not image.analysis.exists %}
+          <span class="alt-text-display alt-missing"
+            >[TRŪKST ALT ATRIBŪTA]</span
+          >
+          {% elif image.analysis.is_empty %}
+          <span class="alt-text-display alt-empty">[TUKŠS (alt="")]</span>
+          {% else %}
+          <span class="alt-text-display">"{{ image.alt }}"</span>
+          {% endif %} {# Ieteikumi / Problēmas #} {% if image.suggestions %}
+          <ul class="suggestions">
+            {% for suggestion in image.suggestions %}
+            <li>{{ suggestion }}</li>
+            {% endfor %}
+          </ul>
+          {# Ja nav ieteikumu UN alt eksistē un nav tukšs - parādām OK statusu
+          #} {% elif image.analysis.exists and not image.analysis.is_empty %}
+          <span class="status-ok">Izskatās labi!</span>
+          {% endif %}
+        </div>
+        {# end .image-details #}
+      </li>
+      {% else %} {# Ja rezultātu saraksts ir tukšs #}
+      <p>Šajā lapā netika atrasti <code>&lt;img&gt;</code> tagi.</p>
+      {% endfor %}
+    </ul>
+    {% elif results is none and request.method == 'POST' and not error %} {# Ja
+    nav kļūdas, bet rezultātu nav (piem., neviens img tags) #}
+    <p>
+      Analīze pabeigta. Šajā lapā netika atrasti <code>&lt;img&gt;</code> tagi.
+    </p>
+    {% endif %} {# end if results #}
+  </body>
+</html>
