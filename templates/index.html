@@ -10,97 +10,148 @@
     />
   </head>
   <body>
-    <h1>ALT Teksta Pārbaudītājs</h1>
-
-    <form method="POST" action="/">
-      <label for="url">Ievadi tīmekļa lapas URL:</label>
-      {# Parādām iepriekš ievadīto URL, ja tāds bija #}
-      <input
-        type="url"
-        id="url"
-        name="url"
-        required
-        size="50"
-        value="{{ submitted_url }}"
-      />
-      <button type="submit">Analizēt</button>
-    </form>
-
-    {# Attēlojam kļūdas ziņojumu, ja tāds ir #} {% if error %}
-    <div class="error-message">{{ error }}</div>
-    {% endif %}
-
-    <hr />
-
-    {# Attēlojam rezultātus tikai tad, ja tie ir un nav kļūdas #} {% if results
-    is not none and not error %}
-    <div class="results-summary">
-      <h2>Analīzes Kopsavilkums:</h2>
-      {% set total_images = results|length %} {# Skaitām attēlus ar ieteikumiem
-      (garāks saraksts nekā 0) #} {% set issues_count = results |
-      selectattr('suggestions', '>', []) | list | length %} {% set
-      missing_alt_count = results | selectattr('analysis.exists', 'equalto',
-      false) | list | length %}
-
-      <p>Kopā atrasti attēli: <strong>{{ total_images }}</strong></p>
-      <p>
-        Attēli ar potenciālām problēmām vai ieteikumiem:
-        <strong>{{ issues_count }}</strong>
+    <div class="container">
+      <h1>ALT Teksta Pārbaudītājs</h1>
+      <p class="description">
+        Ievadiet tīmekļa lapas URL, lai analizētu attēlu ALT tekstus un saņemtu
+        ieteikumus to uzlabošanai saskaņā ar piekļūstamības vadlīnijām.
       </p>
-      <p>Attēli bez ALT atribūta: <strong>{{ missing_alt_count }}</strong></p>
-    </div>
 
-    <h2>Detalizēti Rezultāti:</h2>
-    <ul class="results-list">
-      {% for image in results %}
-      <li>
-        {# Sīktēls (izmantojam absolūto src) #}
-        <img
-          src="{{ image.src }}"
-          alt="Pārbaudāmā attēla sīktēls ({{ image.src }})"
-          loading="lazy"
+      <form method="POST" action="/" id="url-form">
+        <label for="url">Tīmekļa lapas URL:</label>
+        <input
+          type="url"
+          id="url"
+          name="url"
+          required
+          size="50"
+          value="{{ submitted_url }}"
+          placeholder="piem., https://www.example.com"
         />
+        <button type="submit">Analizēt</button>
+      </form>
 
-        <div class="image-details">
-          {# Attēla avots #}
-          <strong>Attēls (src):</strong>
-          <a href="{{ image.src }}" target="_blank" rel="noopener noreferrer"
-            >{{ image.src }}</a
-          >
-          <br />
+      <div
+        id="loading-indicator"
+        class="loading-indicator"
+        style="display: none"
+      >
+        Notiek analīze, lūdzu uzgaidiet... ⏳
+      </div>
 
-          {# ALT teksta attēlojums #}
-          <strong>ALT teksts:</strong>
-          {% if not image.analysis.exists %}
-          <span class="alt-text-display alt-missing"
-            >[TRŪKST ALT ATRIBŪTA]</span
-          >
-          {% elif image.analysis.is_empty %}
-          <span class="alt-text-display alt-empty">[TUKŠS (alt="")]</span>
-          {% else %}
-          <span class="alt-text-display">"{{ image.alt }}"</span>
-          {% endif %} {# Ieteikumi / Problēmas #} {% if image.suggestions %}
-          <ul class="suggestions">
-            {% for suggestion in image.suggestions %}
-            <li>{{ suggestion }}</li>
-            {% endfor %}
-          </ul>
-          {# Ja nav ieteikumu UN alt eksistē un nav tukšs - parādām OK statusu
-          #} {% elif image.analysis.exists and not image.analysis.is_empty %}
-          <span class="status-ok">Izskatās labi!</span>
-          {% endif %}
-        </div>
-        {# end .image-details #}
-      </li>
-      {% else %} {# Ja rezultātu saraksts ir tukšs #}
-      <p>Šajā lapā netika atrasti <code>&lt;img&gt;</code> tagi.</p>
-      {% endfor %}
-    </ul>
-    {% elif results is none and request.method == 'POST' and not error %} {# Ja
-    nav kļūdas, bet rezultātu nav (piem., neviens img tags) #}
-    <p>
-      Analīze pabeigta. Šajā lapā netika atrasti <code>&lt;img&gt;</code> tagi.
-    </p>
-    {% endif %} {# end if results #}
+      {# Attēlojam kļūdas ziņojumu, ja tāds ir #} {% if error %}
+      <div class="error-message">{{ error }}</div>
+      {% endif %}
+
+      <hr />
+
+      {# Attēlojam rezultātus tikai tad, ja tie ir definēti (nav None) un nav
+      kļūdas #} {% if results is not none and not error %}
+      <div class="results-summary">
+        <h2>Analīzes Kopsavilkums:</h2>
+        {% set total_images = results|length %} {% set issues_count = results |
+        selectattr('suggestions', '>', []) | list | length %} {% set
+        missing_alt_count = results | selectattr('analysis.exists', 'equalto',
+        false) | list | length %}
+
+        <p>Kopā atrasti attēli: <strong>{{ total_images }}</strong></p>
+        <p>
+          Attēli ar potenciālām problēmām vai ieteikumiem:
+          <strong>{{ issues_count }}</strong>
+        </p>
+        <p>Attēli bez ALT atribūta: <strong>{{ missing_alt_count }}</strong></p>
+      </div>
+
+      <h2>Detalizēti Rezultāti:</h2>
+      {% if results %}
+      <ul class="results-list">
+        {% for image in results %}
+        <li>
+          <img
+            src="{{ image.src if image.src else url_for('static', filename='placeholder.png') }}"
+            alt="Pārbaudāmā attēla sīktēls ({{ image.src if image.src else 'Trūkst SRC' }})"
+            loading="lazy"
+            onerror="this.onerror=null; this.src='{{ url_for('static', filename='placeholder.png') }}'; this.alt='Neizdevās ielādēt sīktēlu';"
+          />
+          {# Pievienojam placeholder, ja attēlu nevar ielādēt #}
+
+          <div class="image-details">
+            <strong>Attēls (src):</strong>
+            {% if image.src %}
+            <a href="{{ image.src }}" target="_blank" rel="noopener noreferrer"
+              >{{ image.src }}</a
+            >
+            {% else %}
+            <span style="color: red">[SRC TRŪKST]</span>
+            {% endif %}
+            <br />
+
+            <strong>ALT teksts:</strong>
+            {% if not image.analysis.exists %}
+            <span class="alt-text-display alt-missing"
+              >[TRŪKST ALT ATRIBŪTA]</span
+            >
+            {% elif image.analysis.is_empty %}
+            <span class="alt-text-display alt-empty">[TUKŠS (alt="")]</span>
+            {% else %}
+            <span class="alt-text-display">"{{ image.alt }}"</span>
+            {% endif %} {% if image.suggestions %}
+            <ul class="suggestions">
+              {% for suggestion in image.suggestions %}
+              <li>{{ suggestion }}</li>
+              {% endfor %}
+            </ul>
+            {% elif image.analysis.exists and not image.analysis.is_empty %} {#
+            Ja nav ieteikumu UN alt eksistē un nav tukšs - parādām OK statusu #}
+            <span class="status-ok">Nav acīmredzamu problēmu.</span>
+            {% endif %}
+          </div>
+          {# end .image-details #}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %} {# Ja rezultātu saraksts ir tukšs (bet analīze notika bez
+      kļūdām) #}
+      <p>
+        Analīze pabeigta. Šajā lapā netika atrasti
+        <code>&lt;img&gt;</code> tagi.
+      </p>
+      {% endif %} {# end if results #} {% elif request.method == 'POST' and not
+      error %} {# Ja nav kļūdas, bet rezultātu nav (piem., neviens img tags) -
+      ziņojums, kas parādās tikai pēc POST #}
+      <p>
+        Analīze pabeigta. Dotajā URL netika atrasti
+        <code>&lt;img&gt;</code> tagi.
+      </p>
+      {% endif %} {# end if results is not none #}
+    </div>
+    <script>
+      const urlForm = document.getElementById("url-form");
+      const loadingIndicator = document.getElementById("loading-indicator");
+      const urlInput = document.getElementById("url");
+
+      if (urlForm && loadingIndicator && urlInput) {
+        urlForm.addEventListener("submit", function (event) {
+          // Pārbaudām vai URL lauks ir aizpildīts (vienkārša pārbaude)
+          // Pārlūkprogramma jau veic 'required' validāciju, bet pārbaudam papildus
+          if (urlInput.value.trim() === "") {
+            // Ja ir tukšs, neļaujam nosūtīt un pārtraucam (lai gan 'required' to jau dara)
+            // event.preventDefault(); // Nav obligāti nepieciešams ar 'required'
+            loadingIndicator.style.display = "none"; // Nodrošinām, ka indikators ir paslēpts
+          } else {
+            // Ja nav tukšs, parādām indikatoru
+            loadingIndicator.style.display = "block";
+          }
+          // Forma turpina nosūtīties
+        });
+      }
+
+      // Paslēpt indikatoru, ja lietotājs ielādē lapu no pārlūka kešatmiņas (piem., nospiežot 'back' pogu)
+      window.addEventListener("pageshow", function (event) {
+        if (loadingIndicator) {
+          loadingIndicator.style.display = "none";
+        }
+      });
+    </script>
   </body>
 </html>
