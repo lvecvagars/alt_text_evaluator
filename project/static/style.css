@@ -66,8 +66,6 @@ form input[type="url"] {
   box-sizing: border-box;
 }
 
-/* Tukšais '.form-group select {}' noteikums ir izņemts */
-
 form input[type="url"] {
   transition: border-color 0.2s ease;
 }
@@ -208,6 +206,7 @@ hr {
   background-color: transparent;
   border-radius: 4px;
   margin-top: 5px;
+  margin-bottom: 15px;
 }
 
 .alt-missing {
@@ -220,12 +219,69 @@ hr {
   border: 1px solid #17a2b8;
 }
 
+.ai-analysis-block {
+  margin-top: 10px;
+  margin-bottom: 15px;
+  padding: 10px 15px;
+  border-radius: 4px;
+  border-left-width: 4px;
+  border-left-style: solid;
+  font-size: 0.95em;
+}
+
+.ai-analysis-block strong:first-child {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 600;
+  color: #495057;
+}
+
+.ai-analysis-block.ai-match {
+  background-color: #d4edda;
+  border-left-color: #28a745;
+  color: #155724;
+}
+
+.ai-analysis-block.ai-no-match {
+  background-color: #fff3cd;
+  border-left-color: #ffc107;
+  color: #856404;
+}
+
+.ai-analysis-block.ai-error {
+  background-color: #f8d7da;
+  border-left-color: #dc3545;
+  color: #721c24;
+}
+
+.ai-analysis-block.ai-neutral {
+  background-color: #e9ecef;
+  border-left-color: #6c757d;
+  color: #343a40;
+}
+
+.ai-label-badge {
+  display: inline-block;
+  padding: 0.3em 0.6em;
+  font-size: 85%;
+  font-weight: 600;
+  line-height: 1;
+  color: #fff;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: baseline;
+  border-radius: 0.25rem;
+  background-color: #17a2b8;
+  margin-right: 5px;
+  margin-bottom: 5px;
+}
+
 .status-ok {
-  color: #28a745;
+  color: #155724;
   font-weight: bold;
   display: block;
-  margin-top: 10px;
-  padding: 8px 12px;
+  margin-top: 15px;
+  padding: 10px 15px;
   background-color: #d4edda;
   border-left: 4px solid #28a745;
   border-radius: 4px;
@@ -248,6 +304,11 @@ hr {
   background-color: #fff3cd;
   border-left: 4px solid #ffc107;
   border-radius: 4px;
+  display: block;
+  align-items: initial;
+  gap: initial;
+  box-shadow: none;
+  overflow: initial;
 }
 
 .error-message {
