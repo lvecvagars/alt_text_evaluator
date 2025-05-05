@@ -1,11 +1,14 @@
-# Frāzes, kas ALT tekstā nav vēlamas
-FORBIDDEN_PHRASES = [
-    "attēls par", "bilde par", "picture of", "image of",
-    "logo", "ikona", "grafiks", "diagramma", "foto"
-]
+FORBIDDEN_PHRASES = {
+    'lv': [
+        "attēls par", "bilde par", "foto",
+        "logo", "ikona", "grafiks", "diagramma"
+    ],
+    'en': [
+        "picture of", "image of", "photo of", "photo", "graphic of", "graphic",
+        "logo", "icon", "chart", "diagram", "screenshot"
+    ]
+}
 
-# User-Agent HTTP pieprasījumiem
 USER_AGENT = 'Mozilla/5.0 (compatible; AltTextCheckerBot/1.0; +http://example.com/alt-text-checker-info)'
 
-# HTTP pieprasījuma laika limits (sekundēs)
 REQUEST_TIMEOUT = 15

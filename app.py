@@ -9,7 +9,6 @@ from config import USER_AGENT, REQUEST_TIMEOUT
 
 app = Flask(__name__)
 
-# Pamata logošanas konfigurācija
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S')
@@ -22,24 +21,25 @@ def index():
     results = None
     error_message = None
     submitted_url = ""
+    selected_language = 'lv'
 
     if request.method == 'POST':
         page_url = request.form.get('url', '').strip()
+        selected_language = request.form.get('language', 'lv')
         submitted_url = page_url
 
         if page_url:
-            # Vienkārša URL validācija
             parsed_uri = urlparse(page_url)
             if not parsed_uri.scheme in ['http', 'https']:
                  error_message = "Lūdzu, ievadiet derīgu URL adresi (jāsākas ar http:// vai https://)."
                  app.logger.warning(f"Nederīga URL shēma: {page_url}")
-                 return render_template('index.html', results=None, error=error_message, submitted_url=submitted_url)
+                 return render_template('index.html', results=None, error=error_message, submitted_url=submitted_url, selected_language=selected_language)
 
-            app.logger.info(f"Saņemts pieprasījums analizēt URL: {page_url}")
+            app.logger.info(f"Saņemts pieprasījums analizēt URL: {page_url} valodai: {selected_language}")
             try:
                 headers = {'User-Agent': USER_AGENT}
                 response = requests.get(page_url, headers=headers, timeout=REQUEST_TIMEOUT, allow_redirects=True)
-                response.raise_for_status() # Pārbauda HTTP kļūdas (4xx, 5xx)
+                response.raise_for_status()
 
                 content_type = response.headers.get('content-type', '').lower()
                 if 'text/html' not in content_type:
@@ -53,10 +53,9 @@ def index():
 
                 results = []
                 for img in img_tags:
-                    image_analysis_data = analyze_image_alt(img, page_url)
+                    image_analysis_data = analyze_image_alt(img, page_url, selected_language)
                     results.append(image_analysis_data)
 
-            # Kļūdu apstrāde
             except requests.exceptions.Timeout:
                 error_message = f"Vaicājums uz adresi pārsniedza laika limitu ({REQUEST_TIMEOUT}s)."
                 app.logger.error(f"Timeout kļūda pieprasot {page_url}")
@@ -76,7 +75,7 @@ def index():
             except requests.exceptions.RequestException as e:
                 error_message = f"Tīkla vai cita pieprasījuma kļūda: {e}"
                 app.logger.error(f"Cita RequestException pieprasot {page_url}: {e}", exc_info=True)
-            except ValueError as e: # Piemēram, nepareizs content-type
+            except ValueError as e:
                 error_message = str(e)
             except Exception as e:
                 error_message = "Radās neparedzēta iekšēja kļūda."
@@ -86,7 +85,7 @@ def index():
              if request.method == 'POST':
                   error_message = "Lūdzu, ievadiet URL adresi."
 
-    return render_template('index.html', results=results, error=error_message, submitted_url=submitted_url)
+    return render_template('index.html', results=results, error=error_message, submitted_url=submitted_url, selected_language=selected_language)
 
 if __name__ == '__main__':
     app.run(debug=True, host='127.0.0.1', port=5000)
