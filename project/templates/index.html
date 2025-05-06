@@ -34,7 +34,6 @@
     <h2>Analīzes Kopsavilkums</h2>
     {% set total_images = results|length %}
     {% set issues_count = results | selectattr('suggestions', '>', []) | list | length %}
-    {# Nomainīts missing_alt_count uz tukss_alt_count un nosacījums uz analysis.is_empty #}
     {% set tukss_alt_count = results | selectattr('analysis.is_empty', 'equalto', true) | list | length %}
     
     <div class="stats-container">
@@ -46,7 +45,6 @@
         <div class="stat-number">{{ issues_count }}</div>
         <div class="stat-label">Ar ieteikumiem</div>
       </div>
-      {# Atjaunots statistikas bloks "Tukšs ALT" #}
       <div class="stat-card {% if tukss_alt_count > 0 %}stat-error{% endif %}">
         <div class="stat-number">{{ tukss_alt_count }}</div>
         <div class="stat-label">Tukšs ALT</div>
@@ -59,7 +57,6 @@
   <div class="filters">
     <button class="filter-btn active" data-filter="all">Visi attēli ({{ total_images }})</button>
     <button class="filter-btn" data-filter="issues">Ar ieteikumiem ({{ issues_count }})</button>
-    {# Atjaunota filtra poga "Tukšs ALT" ar jauno data-filter un skaitu #}
     <button class="filter-btn" data-filter="empty_alt">Tukšs ALT ({{ tukss_alt_count }})</button>
   </div>
   
@@ -67,11 +64,10 @@
   <ul class="results-list">
     {% for image in results %}
     {% set analysis_data = image.analysis %} {# Ērtības mainīgais #}
-    {% set ai = analysis_data.ai_analysis or {} %}
+    {% set ai = analysis_data.ai_analysis or {} %} {# Nodrošina, ka ai vienmēr ir dict #}
     {% set suggestions_rendered = image.suggestions|length > 0 %}
     {% set has_issues = suggestions_rendered or not analysis_data.exists or analysis_data.is_empty %}
     
-    {# Pievienota klase 'empty-alt', ja analysis_data.is_empty ir true #}
     <li class="result-item {% if has_issues %}has-issues{% endif %} {% if not analysis_data.exists %}missing-alt{% endif %} {% if analysis_data.is_empty %}empty-alt{% endif %}">
       <div class="result-header">
         <img src="{{ image.src if image.src != 'Nezināms SRC' else url_for('main.static', filename='placeholder.png') }}"
@@ -83,22 +79,21 @@
           <h3>Attēls {{ loop.index }}</h3>
           <div class="status-indicators">
             {% if not analysis_data.exists %}
-              <span class="status-badge status-error">Nav ALT</span> {# Šis paliek gadījumiem, kad atribūts tiešām trūkst #}
+              <span class="status-badge status-error">Nav ALT</span> 
             {% elif analysis_data.is_empty %}
-              <span class="status-badge status-error">Tukšs ALT</span> {# Šis ir galvenais rādītājs, ko tagad filtrējam #}
-            {% elif suggestions_rendered %} {# Ja ir ieteikumi, tas jau norāda uz uzmanību #}
+              <span class="status-badge status-error">Tukšs ALT</span>
+            {% elif suggestions_rendered %}
               <span class="status-badge status-warning">Ieteikumi</span>
             {% else %}
               <span class="status-badge status-success">Kārtībā</span>
             {% endif %}
             
-            {# AI atbilstības statuss - VIENKĀRŠOTA LOĢIKA #}
             {% if ai.matched_phrase_count is defined and ai.total_phrases_compared is defined %}
               {% set total_phrases_for_ui = ai.total_phrases_compared if ai.total_phrases_compared > 0 else 0 %}
-              {% if total_phrases_for_ui > 0 %} {# Rādīt tikai, ja ir ar ko salīdzināt #}
+              {% if total_phrases_for_ui > 0 %}
                 {% if ai.matched_phrase_count > 0 %}
                   <span class="status-badge status-success">{{ ai.matched_phrase_count }}/{{ total_phrases_for_ui }} MI atslēgvārdi</span>
-                {% else %} {# Attiecas uz gadījumu, kad matched_phrase_count == 0 #}
+                {% else %}
                   <span class="status-badge status-warning">{{ ai.matched_phrase_count }}/{{ total_phrases_for_ui }} MI atslēgvārdi</span>
                 {% endif %}
               {% endif %}
@@ -124,7 +119,7 @@
           {% if not analysis_data.exists %}
             <span class="alt-text-display alt-missing">Trūkst ALT atribūta</span>
           {% elif analysis_data.is_empty %}
-            <span class="alt-text-display alt-empty">Tukšs (alt="") <small class="text-muted">- Piezīme: Var būt korekti dekoratīviem attēliem.</small></span>
+            <span class="alt-text-display alt-empty">Tukšs (alt="")</span>
           {% else %}
             <span class="alt-text-display">{{ image.alt }}</span>
           {% endif %}
@@ -140,8 +135,9 @@
               <span>{{ ai.info }}</span>
             {% elif ai.get('labels_for_display') %}
               <div class="ai-labels-container">
+                {# Pievienota 'match' klase, ja atslēgvārds atrasts (pēc maskas) #}
                 {% for label_text in ai.labels_for_display %}
-                  <span class="ai-label-badge">{{ label_text }}</span>
+                  <span class="ai-label-badge {% if ai.matched_keyword_mask and loop.index0 < ai.matched_keyword_mask|length and ai.matched_keyword_mask[loop.index0] %}match{% endif %}">{{ label_text }}</span>
                 {% endfor %}
               </div>
               
@@ -237,7 +233,7 @@
             displayStyle = 'block';
           } else if (filter === 'issues' && item.classList.contains('has-issues')) {
             displayStyle = 'block';
-          } else if (filter === 'empty_alt' && item.classList.contains('empty-alt')) { // Mainīts nosacījums uz 'empty_alt'
+          } else if (filter === 'empty_alt' && item.classList.contains('empty-alt')) {
             displayStyle = 'block';
           }
           item.style.display = displayStyle;

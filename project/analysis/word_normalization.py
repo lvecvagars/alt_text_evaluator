@@ -65,39 +65,46 @@ def compare_alt_text_with_ai_phrases(alt_text, ai_keyword_phrases, language='lv'
     Salīdzina ALT tekstu ar AI atslēgvārdu frāzēm.
     Frāze tiek uzskatīta par atbilstošu, ja visi tās normalizētie vārdi
     ir atrodami ALT teksta normalizētajos vārdos.
+    Atgriež sakritušo frāžu skaitu, kopējo frāžu skaitu un sakritības masku (boolean sarakstu).
     """
-    if not alt_text or not ai_keyword_phrases:
-        return 0, len(ai_keyword_phrases) if ai_keyword_phrases else 0
+    if not ai_keyword_phrases: # Ja nav AI frāžu, nav ko salīdzināt
+        return 0, 0, []
+        
+    if not alt_text: # Ja nav ALT teksta, neviena frāze nevar sakrist
+        return 0, len(ai_keyword_phrases), [False] * len(ai_keyword_phrases)
 
     alt_words_tokenized = tokenize_text(alt_text)
     normalized_alt_words_set = {normalize_word(word, language) for word in alt_words_tokenized if word}
 
-    if not normalized_alt_words_set:
-        return 0, len(ai_keyword_phrases)
+    if not normalized_alt_words_set: # Ja ALT teksts nesatur normalizējamus vārdus
+        return 0, len(ai_keyword_phrases), [False] * len(ai_keyword_phrases)
 
     matched_phrase_count = 0
-    valid_phrase_count = 0 
+    matched_mask = [False] * len(ai_keyword_phrases) # Inicializē masku
 
-    for phrase_text in ai_keyword_phrases:
+    for i, phrase_text in enumerate(ai_keyword_phrases):
         if not phrase_text or not phrase_text.strip():
+            # matched_mask[i] paliek False tukšām/nederīgām frāzēm
             continue 
-        
-        valid_phrase_count += 1
 
         ai_phrase_tokenized_words = tokenize_text(phrase_text)
         if not ai_phrase_tokenized_words:
+            # matched_mask[i] paliek False
             continue
 
         current_ai_phrase_normalized_words = {normalize_word(word, language) for word in ai_phrase_tokenized_words if word}
         
         if not current_ai_phrase_normalized_words:
+            # matched_mask[i] paliek False
             continue
 
         if current_ai_phrase_normalized_words.issubset(normalized_alt_words_set):
             matched_phrase_count += 1
+            matched_mask[i] = True # Atzīmē šo frāzi kā sakritušu
             
-    final_total_phrases_to_compare_against = len(ai_keyword_phrases) # Kopējais skaits ir sākotnējais frāžu skaits sarakstā
+    final_total_phrases_to_compare_against = len(ai_keyword_phrases)
 
     logger.debug(f"Frāžu salīdzināšana: Alt normalizētie vārdi='{normalized_alt_words_set}', "
-                 f"AI frāzes='{ai_keyword_phrases}', Sakrita frāzes={matched_phrase_count}, Kopā AI frāzes={final_total_phrases_to_compare_against}")
-    return matched_phrase_count, final_total_phrases_to_compare_against
+                 f"AI frāzes='{ai_keyword_phrases}', Sakrita frāzes={matched_phrase_count}, Kopā AI frāzes={final_total_phrases_to_compare_against}, "
+                 f"Sakritības maska={matched_mask}")
+    return matched_phrase_count, final_total_phrases_to_compare_against, matched_mask

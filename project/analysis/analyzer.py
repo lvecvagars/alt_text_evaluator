@@ -119,7 +119,7 @@ def analyze_image_alt(img_tag, page_url, selected_language='lv'):
                     else:
                         analysis['ai_analysis']['error'] = f"MI attēla analīzes kļūda: {vision_error}."
                 
-                elif original_ai_labels:
+                elif original_ai_labels: # original_ai_labels ir saraksts (var būt tukšs)
                     analysis['ai_analysis']['api_original_labels'] = original_ai_labels 
 
                     phrases_for_comparison = original_ai_labels
@@ -131,7 +131,7 @@ def analyze_image_alt(img_tag, page_url, selected_language='lv'):
                             translated_lv_phrases, translation_err_lv = translate_labels(original_ai_labels, 'lv')
                             if translation_err_lv:
                                 analysis['ai_analysis']['translation_error'] = translation_err_lv
-                            elif translated_lv_phrases:
+                            elif translated_lv_phrases: # Pārbaudām vai tulkošana bija veiksmīga
                                 phrases_for_comparison = translated_lv_phrases
                                 language_for_comparison = 'lv'
                                 analysis['ai_analysis']['api_translated_labels'] = translated_lv_phrases
@@ -140,14 +140,16 @@ def analyze_image_alt(img_tag, page_url, selected_language='lv'):
                     analysis['ai_analysis']['labels_for_display'] = labels_to_display_in_ui
                     analysis['ai_analysis']['used_language_for_comparison'] = language_for_comparison.upper()
 
-                    matched_phrase_count, total_input_phrases = compare_alt_text_with_ai_phrases(
+                    # Saņemam sakritības masku no compare_alt_text_with_ai_phrases
+                    matched_phrase_count, total_input_phrases, matched_keyword_mask = compare_alt_text_with_ai_phrases(
                         alt_text,
                         phrases_for_comparison,
                         language=language_for_comparison
                     )
                     analysis['ai_analysis']['matched_phrase_count'] = matched_phrase_count
                     analysis['ai_analysis']['total_phrases_compared'] = total_input_phrases
-                    
+                    analysis['ai_analysis']['matched_keyword_mask'] = matched_keyword_mask # Saglabājam masku
+
                     ai_suggestion_parts = []
                     if total_input_phrases > 0:
                         ai_suggestion_parts.append(
@@ -170,7 +172,7 @@ def analyze_image_alt(img_tag, page_url, selected_language='lv'):
                     if ai_suggestion_parts:
                         suggestions.append(" ".join(ai_suggestion_parts))
                 
-                elif not original_ai_labels and not vision_error and enable_vision: # Ja Vision API bija ieslēgts, bet neatgrieza ne kļūdu, ne atslēgvārdus
+                elif not original_ai_labels and not vision_error and enable_vision: 
                     analysis['ai_analysis']['info'] = "MI neatpazina atslēgvārdus šim attēlam."
 
 
