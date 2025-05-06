@@ -47,7 +47,7 @@
         <div class="stat-label">Ar ieteikumiem</div>
       </div>
       {# Atjaunots statistikas bloks "Tukšs ALT" #}
-      <div class="stat-card {% if tukss_alt_count > 0 %}stat-warning{% endif %}">
+      <div class="stat-card {% if tukss_alt_count > 0 %}stat-error{% endif %}">
         <div class="stat-number">{{ tukss_alt_count }}</div>
         <div class="stat-label">Tukšs ALT</div>
       </div>
@@ -58,7 +58,7 @@
   
   <div class="filters">
     <button class="filter-btn active" data-filter="all">Visi attēli ({{ total_images }})</button>
-    <button class="filter-btn" data-filter="issues">Ar problēmām ({{ issues_count }})</button>
+    <button class="filter-btn" data-filter="issues">Ar ieteikumiem ({{ issues_count }})</button>
     {# Atjaunota filtra poga "Tukšs ALT" ar jauno data-filter un skaitu #}
     <button class="filter-btn" data-filter="empty_alt">Tukšs ALT ({{ tukss_alt_count }})</button>
   </div>
@@ -85,7 +85,7 @@
             {% if not analysis_data.exists %}
               <span class="status-badge status-error">Nav ALT</span> {# Šis paliek gadījumiem, kad atribūts tiešām trūkst #}
             {% elif analysis_data.is_empty %}
-              <span class="status-badge status-warning">Tukšs ALT</span> {# Šis ir galvenais rādītājs, ko tagad filtrējam #}
+              <span class="status-badge status-error">Tukšs ALT</span> {# Šis ir galvenais rādītājs, ko tagad filtrējam #}
             {% elif suggestions_rendered %} {# Ja ir ieteikumi, tas jau norāda uz uzmanību #}
               <span class="status-badge status-warning">Ieteikumi</span>
             {% else %}
