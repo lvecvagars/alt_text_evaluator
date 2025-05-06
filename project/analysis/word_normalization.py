@@ -46,39 +46,58 @@ def normalize_word(word, language='lv'):
             
         return word
     
-    else:
+    else: 
         try:
             return simplemma.lemmatize(word, lang=language)
         except Exception as e:
-            logger.debug(f"simplemma kļūda vārdam '{word}': {e}")
+            logger.debug(f"simplemma kļūda vārdam '{word}' valodai '{language}': {e}")
         return word
 
 def tokenize_text(text):
     if not text:
         return []
-    
-    words = re.findall(r'\b[a-zA-ZāčēģīķļņšūžĀČĒĢĪĶĻŅŠŪŽ]+\b', text.lower(), re.UNICODE)
+    # Meklē burtu virknes, kas var ietvert iekšējas defises (piem., "self-propelled").
+    words = re.findall(r'\b[a-zA-ZāčēģīķļņšūžĀČĒĢĪĶĻŅŠŪŽ]+(?:-[a-zA-ZāčēģīķļņšūžĀČĒĢĪĶĻŅŠŪŽ]+)*\b', text.lower(), re.UNICODE)
     return words
 
-def compare_alt_with_labels(alt_text, labels_to_compare, language='lv'):
-    if not alt_text or not labels_to_compare:
-        return 0, len(labels_to_compare) if labels_to_compare else 0
-    
-    alt_words = tokenize_text(alt_text)
-    alt_normalized = {normalize_word(word, language) for word in alt_words if word}
-    
-    all_label_normalized = set()
-    for label in labels_to_compare:
-        label_words = tokenize_text(label)
-        for word in label_words:
-            if word:
-                normalized = normalize_word(word, language)
-                if normalized:
-                    all_label_normalized.add(normalized)
-    
-    matches = alt_normalized.intersection(all_label_normalized)
-    matched_count = len(matches)
-    total_normalized = len(all_label_normalized)
-    
-    logger.debug(f"Salīdzināšana ar normalizāciju: Alt normalizēti={alt_normalized}, Label normalizēti={all_label_normalized}, Sakritības={matches}")
-    return matched_count, total_normalized
+def compare_alt_text_with_ai_phrases(alt_text, ai_keyword_phrases, language='lv'):
+    """
+    Salīdzina ALT tekstu ar AI atslēgvārdu frāzēm.
+    Frāze tiek uzskatīta par atbilstošu, ja visi tās normalizētie vārdi
+    ir atrodami ALT teksta normalizētajos vārdos.
+    """
+    if not alt_text or not ai_keyword_phrases:
+        return 0, len(ai_keyword_phrases) if ai_keyword_phrases else 0
+
+    alt_words_tokenized = tokenize_text(alt_text)
+    normalized_alt_words_set = {normalize_word(word, language) for word in alt_words_tokenized if word}
+
+    if not normalized_alt_words_set:
+        return 0, len(ai_keyword_phrases)
+
+    matched_phrase_count = 0
+    valid_phrase_count = 0 
+
+    for phrase_text in ai_keyword_phrases:
+        if not phrase_text or not phrase_text.strip():
+            continue 
+        
+        valid_phrase_count += 1
+
+        ai_phrase_tokenized_words = tokenize_text(phrase_text)
+        if not ai_phrase_tokenized_words:
+            continue
+
+        current_ai_phrase_normalized_words = {normalize_word(word, language) for word in ai_phrase_tokenized_words if word}
+        
+        if not current_ai_phrase_normalized_words:
+            continue
+
+        if current_ai_phrase_normalized_words.issubset(normalized_alt_words_set):
+            matched_phrase_count += 1
+            
+    final_total_phrases_to_compare_against = len(ai_keyword_phrases) # Kopējais skaits ir sākotnējais frāžu skaits sarakstā
+
+    logger.debug(f"Frāžu salīdzināšana: Alt normalizētie vārdi='{normalized_alt_words_set}', "
+                 f"AI frāzes='{ai_keyword_phrases}', Sakrita frāzes={matched_phrase_count}, Kopā AI frāzes={final_total_phrases_to_compare_against}")
+    return matched_phrase_count, final_total_phrases_to_compare_against

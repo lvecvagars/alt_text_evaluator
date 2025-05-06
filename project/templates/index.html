@@ -1,10 +1,9 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <h1>ALT Teksta Pārbaudītājs</h1>
+  <h1>ALT Teksta Novērtēšanas Rīks</h1>
   <p class="description">
     Ievadiet tīmekļa lapas URL un izvēlieties ALT tekstu pārbaudes valodu.
-    {% if config.ENABLE_VISION_API %}Papildus tiek veikta AI atslēgvārdu analīze, lai palīdzētu novērtēt ALT teksta atbilstību attēla saturam{% if config.ENABLE_TRANSLATION_API %}{% set target_lang_display = config.TARGET_TRANSLATION_LANGUAGE %}{% if target_lang_display == 'lv' %} (ar iespēju tulkot atslēgvārdus latviski){% elif target_lang_display == 'en' %}{% else %} (ar iespēju tulkot atslēgvārdus uz "{{ target_lang_display }}"){% endif %}{% endif %}.{% endif %}
   </p>
   <form method="POST" action="{{ url_for('main.index') }}" id="url-form">
     <div class="form-group">
@@ -89,13 +88,14 @@
               <span class="status-badge status-success">Kārtībā</span>
             {% endif %}
             
-            {% if ai.matched_count is defined and ai.total_compared_count is defined %}
-              {% set total_compared_for_ui = ai.total_compared_count if ai.total_compared_count > 0 else (ai.labels_for_display|length if ai.labels_for_display else 0) %}
-              {% if total_compared_for_ui > 0 %} {# Rādīt tikai, ja ir ar ko salīdzināt #}
-                {% if ai.matched_count == 0 %}
-                  <span class="status-badge status-warning">{{ ai.matched_count }}/{{ total_compared_for_ui }} AI atbilstības</span>
-                {% elif ai.matched_count > 0 %}
-                  <span class="status-badge status-success">{{ ai.matched_count }}/{{ total_compared_for_ui }} AI atbilstības</span>
+            {# AI atbilstības statuss - VIENKĀRŠOTA LOĢIKA #}
+            {% if ai.matched_phrase_count is defined and ai.total_phrases_compared is defined %}
+              {% set total_phrases_for_ui = ai.total_phrases_compared if ai.total_phrases_compared > 0 else 0 %}
+              {% if total_phrases_for_ui > 0 %} {# Rādīt tikai, ja ir ar ko salīdzināt #}
+                {% if ai.matched_phrase_count > 0 %}
+                  <span class="status-badge status-success">{{ ai.matched_phrase_count }}/{{ total_phrases_for_ui }} MI atbilstības</span>
+                {% else %} {# Attiecas uz gadījumu, kad matched_phrase_count == 0 #}
+                  <span class="status-badge status-warning">{{ ai.matched_phrase_count }}/{{ total_phrases_for_ui }} MI atbilstības</span>
                 {% endif %}
               {% endif %}
             {% endif %}
@@ -129,27 +129,27 @@
         {# AI Analīzes Bloks #}
         {% if config.ENABLE_VISION_API and ai %}
           <div class="details-section ai-section">
-            <strong>AI Analīze (valoda: {{ ai.used_language|upper if ai.used_language else 'N/A' }}):</strong>
+            <strong>MI Analīze:</strong>
             {% if ai.error %}
               <span class="ai-error">{{ ai.error }}</span>
+            {% elif ai.info %}
+              <span>{{ ai.info }}</span>
             {% elif ai.get('labels_for_display') %}
               <div class="ai-labels-container">
-                {# Piezīme: specifisku vārdu 'match' klasei nepieciešami backend dati par katra vārda sakritību #}
-                {# Pašlaik atstājam bez individuālas 'match' klases uz katra atslēgvārda šeit #}
                 {% for label_text in ai.labels_for_display %}
                   <span class="ai-label-badge">{{ label_text }}</span>
                 {% endfor %}
               </div>
               
-              {% if ai.matched_count is defined and ai.total_compared_count is defined %}
-                {% set total_compared_for_ui = ai.total_compared_count if ai.total_compared_count > 0 else (ai.labels_for_display|length if ai.labels_for_display else 0) %}
-                {% if total_compared_for_ui > 0 %} {# Rādīt tikai, ja ir ar ko salīdzināt #}
+              {% if ai.matched_phrase_count is defined and ai.total_phrases_compared is defined %}
+                {% set total_phrases_for_ui = ai.total_phrases_compared if ai.total_phrases_compared > 0 else 0 %}
+                {% if total_phrases_for_ui > 0 %}
                   <div class="ai-match-info">
                     <div class="match-meter">
-                      {% set percentage = (ai.matched_count / total_compared_for_ui * 100) if total_compared_for_ui > 0 else 0 %}
+                      {% set percentage = (ai.matched_phrase_count / total_phrases_for_ui * 100) if total_phrases_for_ui > 0 else 0 %}
                       <div class="match-fill" style="width: {{ percentage }}%"></div>
                     </div>
-                    <span>Saderība: {{ ai.matched_count }} no {{ total_compared_for_ui }} unikāliem normalizētiem AI atslēgvārdiem.</span>
+                    <span>Saderība: {{ ai.matched_phrase_count }} no {{ total_phrases_for_ui }} MI atpazītiem atslēgvārdiem.</span>
                   </div>
                 {% endif %}
               {% endif %}
@@ -157,10 +157,8 @@
               {% if ai.translation_error %}
                 <div class="ai-error">Tulkošanas kļūda: {{ ai.translation_error }}</div>
               {% endif %}
-            {% elif not ai.original_labels and not ai.error %} {# Gadījums, ja Vision API neatgriež neko, bet nav arī kļūdas #}
-              <span>AI neatpazina atslēgvārdus šim attēlam.</span>
             {% else %}
-              <span>AI analīzes dati nav pieejami.</span>
+              <span>AI analīzes dati nav pieejami vai netika veikta.</span>
             {% endif %}
           </div>
         {% endif %}
@@ -199,21 +197,16 @@
       urlForm.addEventListener("submit", function (event) {
         if (urlInput.value.trim() !== "") { 
           loadingIndicator.style.display = "block"; 
-        } else { 
-          // Ja URL ir tukšs, forma pati parādīs 'required' validācijas kļūdu,
-          // tāpēc indikators nav jāslēpj, jo 'submit' notikums var nenotikt.
         }
       });
     }
     
-    // Paslēpj ielādes indikatoru, kad lapa tiek ielādēta (piem., pēc atgriešanās ar 'back' pogu)
     window.addEventListener("pageshow", function (event) {
       if (loadingIndicator) { 
         loadingIndicator.style.display = "none"; 
       }
     });
     
-    // Toggle details
     document.querySelectorAll('.toggle-details').forEach(button => {
       button.addEventListener('click', () => {
         const item = button.closest('.result-item');
@@ -224,7 +217,6 @@
       });
     });
     
-    // Filtering
     const filterButtons = document.querySelectorAll('.filter-btn');
     const resultItems = document.querySelectorAll('.result-item');
     

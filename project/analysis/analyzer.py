@@ -6,7 +6,7 @@ from urllib.parse import urlparse, urljoin
 from flask import current_app
 
 from .providers import get_vision_api_labels, translate_labels
-from .word_normalization import compare_alt_with_labels
+from .word_normalization import compare_alt_text_with_ai_phrases
 
 logger = logging.getLogger(__name__)
 
@@ -23,22 +23,14 @@ def is_svg_file(url):
         return False
 
 def analyze_image_alt(img_tag, page_url, selected_language='lv'):
-    """Analizē viena <img> taga ALT tekstu, ieskaitot AI un tulkošanu."""
     config = current_app.config
     enable_vision = config.get('ENABLE_VISION_API', False)
     enable_translation = config.get('ENABLE_TRANSLATION_API', False)
-    # target_translation_language vairs tieši nenosaka salīdzināšanas valodu, to dara selected_language
-    # Tomēr, ja selected_language = 'lv', tad mērķa tulkojums būs 'lv'.
-    # TARGET_TRANSLATION_LANGUAGE varētu saglabāt, ja nākotnē būtu citi tulkošanas scenāriji.
-    # Pašlaik to ignorēsim par labu selected_language vadītai loģikai.
-
     min_alt_len = config.get('USER_SPECIFIED_MIN_ALT_LENGTH', 5)
     max_alt_len = config.get('USER_SPECIFIED_MAX_ALT_LENGTH', 125)
-    max_ai_labels_to_show = config.get('MAX_AI_LABELS_TO_SHOW', 5)
     forbidden_phrases = config.get('FORBIDDEN_PHRASES', {}).get(selected_language, [])
 
     raw_src = img_tag.get('src')
-    
     if not raw_src or raw_src.strip() == '':
         logger.info("Attēls bez src atribūta izlaists")
         return None
@@ -49,11 +41,9 @@ def analyze_image_alt(img_tag, page_url, selected_language='lv'):
 
     try:
         absolute_src = urljoin(page_url, raw_src.strip())
-        
         if is_svg_file(absolute_src):
             logger.info(f"SVG fails izlaists: {absolute_src}")
             return None
-            
         parsed_src = urlparse(absolute_src)
         is_valid_for_vision = parsed_src.scheme in ['http', 'https']
     except Exception as e:
@@ -63,7 +53,7 @@ def analyze_image_alt(img_tag, page_url, selected_language='lv'):
     analysis = {
         'exists': alt is not None, 'is_empty': None, 'is_too_long': None,
         'is_too_short': None, 'is_placeholder': None, 'is_filename': None,
-        'ai_analysis': None  # Inicializējam ai_analysis kā None
+        'ai_analysis': None 
     }
     suggestions = []
 
@@ -72,20 +62,30 @@ def analyze_image_alt(img_tag, page_url, selected_language='lv'):
         analysis['is_empty'] = alt_text == ""
 
         if not analysis['is_empty']:
-            if len(alt_text) > max_alt_len:
+            alt_len = len(alt_text)
+            if alt_len > max_alt_len:
                 analysis['is_too_long'] = True
-                suggestions.append(f"ALT teksts > {max_alt_len} rakstzīmes.")
-            elif len(alt_text) < min_alt_len:
+                suggestions.append(
+                    f"ALT teksts (garums: {alt_len}) pārsniedz ieteicamo {max_alt_len} rakstzīmju limitu. "
+                    f"Apsveriet saīsināšanu."
+                )
+            elif alt_len < min_alt_len:
                 analysis['is_too_short'] = True
-                suggestions.append(f"ALT teksts < {min_alt_len} rakstzīmes: '{alt_text}'.")
+                suggestions.append(
+                    f"ALT teksts '{alt_text}' (garums: {alt_len}) ir īsāks par {min_alt_len} rakstzīmēm. "
+                    f"Detalizētāks apraksts varētu būt noderīgāks."
+                )
 
             lower_alt = alt_text.lower()
             for phrase in forbidden_phrases:
                 phrase_lower = phrase.lower()
                 if lower_alt.startswith(phrase_lower + ' ') or lower_alt == phrase_lower:
                     analysis['is_placeholder'] = True
-                    suggestions.append(f"ALT teksts sākas ar vispārīgu frāzi: '{phrase}'.")
-                    break
+                    suggestions.append(
+                        f"ALT teksts sākas ar vai ir vispārīga frāze: '{phrase}'. "
+                        f"Aizstājiet ar konkrētāku aprakstu."
+                    )
+                    break 
 
             if absolute_src and not analysis['is_placeholder']:
                 try:
@@ -93,104 +93,100 @@ def analyze_image_alt(img_tag, page_url, selected_language='lv'):
                     filename = os.path.basename(parsed_url.path)
                     if filename:
                         filename_no_ext = os.path.splitext(filename)[0]
-                        alt_text_check = alt_text.strip(string.punctuation).lower()
+                        alt_text_check = alt_text.strip(string.punctuation + ' ').lower()
                         fname_check = filename.lower()
                         fname_noext_check = filename_no_ext.lower()
-                        is_exact_filename = (alt_text_check == fname_check or alt_text_check == fname_noext_check)
                         common_ext = ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.ico')
-                        ends_with_ext = alt_text.lower().endswith(common_ext)
-                        if is_exact_filename or (ends_with_ext and len(alt_text) < 80):
+                        ends_with_common_ext = alt_text_check.endswith(common_ext)
+                        is_exact_filename_match = (alt_text_check == fname_check or alt_text_check == fname_noext_check)
+                        
+                        if is_exact_filename_match or (ends_with_common_ext and len(alt_text_check) < 80):
                             analysis['is_filename'] = True
-                            suggestions.append("ALT teksts izskatās pēc faila nosaukuma.")
+                            suggestions.append(
+                                f"ALT teksts ('{alt_text}') varētu būt faila nosaukums. "
+                                f"Faila nosaukumi parasti nav informatīvi. Aizstājiet ar satura aprakstu."
+                            )
                 except Exception as e:
-                    logger.debug(f"Neizdevās pārbaudīt faila nosaukumu '{absolute_src}': {e}", exc_info=False)
+                    logger.debug(f"Neizdevās pārbaudīt faila nosaukumu ALT tekstā '{absolute_src}': {e}", exc_info=False)
 
-            # --- Sākums AI analīzes blokam ar labojumiem ---
             if enable_vision and is_valid_for_vision:
-                analysis['ai_analysis'] = {} # Inicializējam šeit, jo AI analīze notiks
-                original_ai_labels, vision_error = get_vision_api_labels(absolute_src) # Tie parasti ir 'en'
+                analysis['ai_analysis'] = {} 
+                original_ai_labels, vision_error = get_vision_api_labels(absolute_src)
 
                 if vision_error and not original_ai_labels:
-                    analysis['ai_analysis']['error'] = f"Vision API: {vision_error}"
-                    suggestions.append(f"AI attēla analīze neizdevās: {vision_error}")
+                    if "AI neatpazina atslēgvārdus" in vision_error:
+                        analysis['ai_analysis']['info'] = "MI neatpazina atslēgvārdus šim attēlam."
+                    else:
+                        analysis['ai_analysis']['error'] = f"MI attēla analīzes kļūda: {vision_error}."
+                
                 elif original_ai_labels:
-                    analysis['ai_analysis']['original_labels'] = original_ai_labels[:max_ai_labels_to_show]
+                    analysis['ai_analysis']['api_original_labels'] = original_ai_labels 
 
-                    labels_for_comparison_input = original_ai_labels
-                    language_for_normalization_and_comparison = 'en' # Noklusējums angļu valodai
-                    labels_to_display_in_ui = original_ai_labels[:max_ai_labels_to_show]
-                    
+                    phrases_for_comparison = original_ai_labels
+                    language_for_comparison = 'en' 
+                    labels_to_display_in_ui = original_ai_labels 
+
                     if selected_language == 'lv':
                         if enable_translation:
-                            translated_lv_labels, translation_err_lv = translate_labels(original_ai_labels, 'lv')
+                            translated_lv_phrases, translation_err_lv = translate_labels(original_ai_labels, 'lv')
                             if translation_err_lv:
-                                suggestions.append(f"AI atslēgvārdu tulkošana uz LV neizdevās: {translation_err_lv}. Salīdzināšana notiks ar EN atslēgvārdiem, ALT teksts tiks normalizēts kā angļu valodā.")
                                 analysis['ai_analysis']['translation_error'] = translation_err_lv
-                                # Atkāpšanās: lieto oriģinālos EN atslēgvārdus un EN normalizāciju
-                                labels_for_comparison_input = original_ai_labels
-                                language_for_normalization_and_comparison = 'en'
-                                labels_to_display_in_ui = original_ai_labels[:max_ai_labels_to_show]
-                            elif translated_lv_labels:
-                                labels_for_comparison_input = translated_lv_labels
-                                language_for_normalization_and_comparison = 'lv'
-                                analysis['ai_analysis']['translated_labels'] = translated_lv_labels[:max_ai_labels_to_show]
-                                labels_to_display_in_ui = translated_lv_labels[:max_ai_labels_to_show]
-                        else:
-                            suggestions.append("AI atslēgvārdu tulkošana uz LV nav iespējota. Salīdzināšana notiks ar EN atslēgvārdiem, ALT teksts tiks normalizēts kā angļu valodā.")
-                            labels_for_comparison_input = original_ai_labels
-                            language_for_normalization_and_comparison = 'en'
-                            labels_to_display_in_ui = original_ai_labels[:max_ai_labels_to_show]
-                    
-                    # Ja selected_language == 'en', noklusējuma vērtības jau ir pareizas
-
+                            elif translated_lv_phrases:
+                                phrases_for_comparison = translated_lv_phrases
+                                language_for_comparison = 'lv'
+                                analysis['ai_analysis']['api_translated_labels'] = translated_lv_phrases
+                                labels_to_display_in_ui = translated_lv_phrases
+                        
                     analysis['ai_analysis']['labels_for_display'] = labels_to_display_in_ui
-                    analysis['ai_analysis']['used_language'] = language_for_normalization_and_comparison
+                    analysis['ai_analysis']['used_language_for_comparison'] = language_for_comparison.upper()
 
-                    matched_count, total_unique_normalized_ai_words = compare_alt_with_labels(
+                    matched_phrase_count, total_input_phrases = compare_alt_text_with_ai_phrases(
                         alt_text,
-                        labels_for_comparison_input,
-                        language=language_for_normalization_and_comparison
+                        phrases_for_comparison,
+                        language=language_for_comparison
                     )
-                    analysis['ai_analysis']['matched_count'] = matched_count
-                    analysis['ai_analysis']['total_compared_count'] = total_unique_normalized_ai_words
+                    analysis['ai_analysis']['matched_phrase_count'] = matched_phrase_count
+                    analysis['ai_analysis']['total_phrases_compared'] = total_input_phrases
                     
-                    # Atjaunots ieteikuma ziņojums
-                    suggestion_intro = f"AI atpazina {len(original_ai_labels)} oriģinālos (EN) atslēgvārdus. "
-                    labels_lang_for_suggestion = language_for_normalization_and_comparison.upper()
+                    ai_suggestion_parts = []
+                    if total_input_phrases > 0:
+                        ai_suggestion_parts.append(
+                            f"Jūsu ALT tekstam atbilst {matched_phrase_count} no {total_input_phrases} MI atpazītie atslēgvārdi."
+                        )
+                        if matched_phrase_count == 0:
+                            ai_suggestion_parts.append("Apsveriet ALT teksta papildināšanu, lai tas labāk atbilstu attēla saturam.")
+                        elif matched_phrase_count < total_input_phrases / 2 and matched_phrase_count > 0 :
+                            ai_suggestion_parts.append("Lai gan ir dažas sakritības, ALT tekstu varētu uzlabot, lai tas precīzāk atspoguļotu attēla elementus.")
+                    elif original_ai_labels: 
+                         ai_suggestion_parts.append(
+                            f"MI atpazina sākotnējos atslēgvārdus, bet pēc to apstrādes salīdzināšanai nekas nepalika."
+                        )
+                    
+                    if selected_language == 'lv' and analysis['ai_analysis'].get('translation_error'):
+                        ai_suggestion_parts.append(f"(Tulkošana uz LV neizdevās, salīdzināts ar EN frāzēm.)")
+                    elif selected_language == 'lv' and not enable_translation and enable_vision:
+                         ai_suggestion_parts.append(f"(Tulkošana uz LV nav aktivizēta, salīdzināts ar EN frāzēm.)")
 
-                    if language_for_normalization_and_comparison == 'lv' and analysis['ai_analysis'].get('translated_labels'):
-                        suggestion_intro += "Salīdzināšanai tika izmantoti tulkotie LV atslēgvārdi. "
-                    elif language_for_normalization_and_comparison == 'en':
-                        # Ja selected_language='lv' un notika atkāpšanās uz EN, ziņojums par to jau ir pievienots.
-                        # Šeit vienkārši apstiprinām, ka EN tika izmantots.
-                        if selected_language == 'lv' and not enable_translation: # Pārbaudām, vai tas bija atkāpšanās gadījums
-                             pass # Ziņojums par EN lietošanu jau ir pievienots
-                        elif selected_language == 'lv' and enable_translation and analysis['ai_analysis'].get('translation_error'):
-                             pass # Ziņojums par EN lietošanu jau ir pievienots
-                        else:
-                             suggestion_intro += "Salīdzināšanai tika izmantoti oriģinālie EN atslēgvārdi. "
+                    if ai_suggestion_parts:
+                        suggestions.append(" ".join(ai_suggestion_parts))
+                
+                elif not original_ai_labels and not vision_error and enable_vision: # Ja Vision API bija ieslēgts, bet neatgrieza ne kļūdu, ne atslēgvārdus
+                    analysis['ai_analysis']['info'] = "MI neatpazina atslēgvārdus šim attēlam."
 
-
-                    suggestion_match_info = f"Alt tekstā atrasta saderība ar {matched_count} no {total_unique_normalized_ai_words} unikāliem AI atslēgvārdiem ({labels_lang_for_suggestion}), kas tika izmantoti salīdzināšanai. "
-                    suggestion_match_info += f"Lietotāja saskarnē tiek rādīti līdz {max_ai_labels_to_show} atslēgvārdiem."
-
-                    suggestion_ai = suggestion_intro + suggestion_match_info
-                    if total_unique_normalized_ai_words > 0 and matched_count == 0:
-                        suggestion_ai += " Apsveriet alt teksta papildināšanu, lai tas labāk atbilstu attēla saturam."
-                    suggestions.append(suggestion_ai)
-
-                elif vision_error: # Ja original_ai_labels ir tukšs/None, bet ir vision_error (piem., "AI neatpazina...")
-                    analysis['ai_analysis']['error'] = vision_error
-                    suggestions.append(f"AI analīze: {vision_error}")
-                # Ja original_ai_labels ir tukšs/None un nav vision_error, nekas netiks darīts AI blokā, kas ir pareizi.
 
             elif enable_vision and not is_valid_for_vision:
-                 suggestions.append("AI analīze nav iespējama šim attēla URL.")
-            # --- Beigas AI analīzes blokam ar labojumiem ---
-        else: # alt_text ir tukšs
-            suggestions.append('ALT teksts ir tukšs (alt="").')
-    else: # Trūkst 'alt' atribūta
-        suggestions.append("Trūkst 'alt' atribūta.")
+                 if 'ai_analysis' not in analysis or analysis['ai_analysis'] is None: analysis['ai_analysis'] = {}
+                 analysis['ai_analysis']['error'] = "MI attēla analīze nav iespējama šim URL (nav publiski pieejams vai neatbilstošs formāts)."
+
+        else: 
+            suggestions.append(
+                'ALT teksts ir tukšs (alt=""). Pieņemami tikai tīri dekoratīviem attēliem. '
+                'Ja attēls ir informatīvs, tam nepieciešams apraksts.'
+            )
+    else: 
+        suggestions.append(
+            "Attēlam trūkst obligātā 'alt' atribūta. Pievienojiet 'alt' ar aprakstu vai alt=\"\" dekoratīviem attēliem."
+        )
 
     src_display = absolute_src if absolute_src else (raw_src if raw_src else "Nezināms SRC")
 
