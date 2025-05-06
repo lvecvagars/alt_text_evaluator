@@ -34,7 +34,8 @@
     <h2>Analīzes Kopsavilkums</h2>
     {% set total_images = results|length %}
     {% set issues_count = results | selectattr('suggestions', '>', []) | list | length %}
-    {% set missing_alt_count = results | selectattr('analysis.exists', 'equalto', false) | list | length %}
+    {# Nomainīts missing_alt_count uz tukss_alt_count un nosacījums uz analysis.is_empty #}
+    {% set tukss_alt_count = results | selectattr('analysis.is_empty', 'equalto', true) | list | length %}
     
     <div class="stats-container">
       <div class="stat-card">
@@ -45,9 +46,10 @@
         <div class="stat-number">{{ issues_count }}</div>
         <div class="stat-label">Ar ieteikumiem</div>
       </div>
-      <div class="stat-card {% if missing_alt_count > 0 %}stat-error{% endif %}">
-        <div class="stat-number">{{ missing_alt_count }}</div>
-        <div class="stat-label">Bez ALT atribūta</div>
+      {# Atjaunots statistikas bloks "Tukšs ALT" #}
+      <div class="stat-card {% if tukss_alt_count > 0 %}stat-warning{% endif %}">
+        <div class="stat-number">{{ tukss_alt_count }}</div>
+        <div class="stat-label">Tukšs ALT</div>
       </div>
     </div>
   </div>
@@ -57,7 +59,8 @@
   <div class="filters">
     <button class="filter-btn active" data-filter="all">Visi attēli ({{ total_images }})</button>
     <button class="filter-btn" data-filter="issues">Ar problēmām ({{ issues_count }})</button>
-    <button class="filter-btn" data-filter="missing">Bez ALT ({{ missing_alt_count }})</button>
+    {# Atjaunota filtra poga "Tukšs ALT" ar jauno data-filter un skaitu #}
+    <button class="filter-btn" data-filter="empty_alt">Tukšs ALT ({{ tukss_alt_count }})</button>
   </div>
   
   {% if results %}
@@ -68,7 +71,8 @@
     {% set suggestions_rendered = image.suggestions|length > 0 %}
     {% set has_issues = suggestions_rendered or not analysis_data.exists or analysis_data.is_empty %}
     
-    <li class="result-item {% if has_issues %}has-issues{% endif %} {% if not analysis_data.exists %}missing-alt{% endif %}">
+    {# Pievienota klase 'empty-alt', ja analysis_data.is_empty ir true #}
+    <li class="result-item {% if has_issues %}has-issues{% endif %} {% if not analysis_data.exists %}missing-alt{% endif %} {% if analysis_data.is_empty %}empty-alt{% endif %}">
       <div class="result-header">
         <img src="{{ image.src if image.src != 'Nezināms SRC' else url_for('main.static', filename='placeholder.png') }}"
              alt="Pārbaudāmā attēla sīktēls"
@@ -79,9 +83,9 @@
           <h3>Attēls {{ loop.index }}</h3>
           <div class="status-indicators">
             {% if not analysis_data.exists %}
-              <span class="status-badge status-error">Nav ALT</span>
+              <span class="status-badge status-error">Nav ALT</span> {# Šis paliek gadījumiem, kad atribūts tiešām trūkst #}
             {% elif analysis_data.is_empty %}
-              <span class="status-badge status-warning">Tukšs ALT</span>
+              <span class="status-badge status-warning">Tukšs ALT</span> {# Šis ir galvenais rādītājs, ko tagad filtrējam #}
             {% elif suggestions_rendered %} {# Ja ir ieteikumi, tas jau norāda uz uzmanību #}
               <span class="status-badge status-warning">Ieteikumi</span>
             {% else %}
@@ -93,9 +97,9 @@
               {% set total_phrases_for_ui = ai.total_phrases_compared if ai.total_phrases_compared > 0 else 0 %}
               {% if total_phrases_for_ui > 0 %} {# Rādīt tikai, ja ir ar ko salīdzināt #}
                 {% if ai.matched_phrase_count > 0 %}
-                  <span class="status-badge status-success">{{ ai.matched_phrase_count }}/{{ total_phrases_for_ui }} MI atbilstības</span>
+                  <span class="status-badge status-success">{{ ai.matched_phrase_count }}/{{ total_phrases_for_ui }} MI atslēgvārdi</span>
                 {% else %} {# Attiecas uz gadījumu, kad matched_phrase_count == 0 #}
-                  <span class="status-badge status-warning">{{ ai.matched_phrase_count }}/{{ total_phrases_for_ui }} MI atbilstības</span>
+                  <span class="status-badge status-warning">{{ ai.matched_phrase_count }}/{{ total_phrases_for_ui }} MI atslēgvārdi</span>
                 {% endif %}
               {% endif %}
             {% endif %}
@@ -233,7 +237,7 @@
             displayStyle = 'block';
           } else if (filter === 'issues' && item.classList.contains('has-issues')) {
             displayStyle = 'block';
-          } else if (filter === 'missing' && item.classList.contains('missing-alt')) {
+          } else if (filter === 'empty_alt' && item.classList.contains('empty-alt')) { // Mainīts nosacījums uz 'empty_alt'
             displayStyle = 'block';
           }
           item.style.display = displayStyle;
