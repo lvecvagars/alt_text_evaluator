@@ -1,10 +1,10 @@
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 from flask import render_template, request, current_app
 
 from . import main_bp
-from ..analysis.analyzer import analyze_image_alt
+from ..analysis.analyzer import analyze_image_alt, is_svg_file
 
 @main_bp.route('/', methods=['GET', 'POST'])
 def index():
@@ -46,9 +46,26 @@ def index():
                 current_app.logger.info(f"Atrasti {len(img_tags)} <img> tagi.")
 
                 results = []
+                svg_count = 0
+                empty_src_count = 0
+                
                 for img in img_tags:
+                    # Analizējam attēlu, funkcija atgriež None, ja tas jāizlaiž
                     image_analysis_data = analyze_image_alt(img, page_url, selected_language)
-                    results.append(image_analysis_data)
+                    
+                    if image_analysis_data is not None:
+                        results.append(image_analysis_data)
+                    else:
+                        # Pārbaudām, kāpēc tas tika izlaists
+                        src = img.get('src', '')
+                        if not src or src.strip() == '':
+                            empty_src_count += 1
+                        elif src and is_svg_file(urljoin(page_url, src)):
+                            svg_count += 1
+
+                # Informējam par izlaistajiem
+                if svg_count > 0 or empty_src_count > 0:
+                    current_app.logger.info(f"Izlaisti {svg_count} SVG attēli un {empty_src_count} attēli bez src")
 
             except requests.exceptions.Timeout:
                 error_message = f"Vaicājuma laiks ({request_timeout}s) pārsniegts."
